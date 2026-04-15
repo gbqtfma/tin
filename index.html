@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Tinnitus Therapy">
+<meta name="theme-color" content="#0a0e1a">
+<title>Tinnitus Therapy</title>
+
+<!-- iOS background audio trick: a silent looping audio element registers a real
+     AVAudioSession with iOS, which keeps the Web Audio context alive in background -->
+<audio id="silence" loop>
+  <!-- 1-second silent MP3 as base64 data URI -->
+  <source src="data:audio/mpeg;base64,//uQxAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACcQCAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA//////////////////////////////////////////////////////////////////8AAABhTEFNRTMuMTAwA8MAAAAAAAAAABQgJAUHQQAB4AAAAnGMHkkIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA//sQxAADgnABGiAAQBCqgCRMAAgEAH///////////////7+n/9FTuQsQH//////2NG0jWUGlio5gLQTOtIoeR2WX////X4s9Atb/JRVCbBUpeRUq//////////////////9RUi0f2jn/+xDECgPCjAEGAAAAIVQBIMAAgAHP/9+Lmr//9kuQlALDZamrKCmB4XGHkk3sUDjzHwVpfL/fU3f/9Rz////////5tz//Z2sqt//1ut+L//9tfUSXkUk//////////////Y2L//7EMQLg7IRAQAAABCpQCxMAAgAH+f/////+8lUAACQDolCFb0FAIANDIUMgSZS1DYpCGBoZQlVQoBRCVFUAgMxBTQqMoE07" type="audio/mpeg">
+</audio>
+
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #060910;
+    --surface: #0d1221;
+    --surface2: #141929;
+    --border: rgba(100,140,255,0.12);
+    --accent: #4a7fff;
+    --accent2: #00d4aa;
+    --text: #e8eaf2;
+    --text2: #7a8aaa;
+    --warn: #ff6b6b;
+    --glow: rgba(74,127,255,0.3);
+    --radius: 16px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+
+  body {
+    padding: env(safe-area-inset-top, 20px) 20px env(safe-area-inset-bottom, 20px);
+    padding-top: max(env(safe-area-inset-top), 24px);
+  }
+
+  /* Subtle animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 20% 20%, rgba(74,127,255,0.07) 0%, transparent 70%),
+      radial-gradient(ellipse 50% 40% at 80% 80%, rgba(0,212,170,0.06) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    padding: 28px 0 32px;
+  }
+  .header h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: -0.5px;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+  .header p {
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 0.5px;
+    line-height: 1.6;
+  }
+  .header a { color: var(--accent); text-decoration: none; }
+
+  /* iOS tip banner */
+  .ios-tip {
+    background: rgba(0,212,170,0.08);
+    border: 1px solid rgba(0,212,170,0.25);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 20px;
+    font-size: 11.5px;
+    color: var(--accent2);
+    line-height: 1.6;
+  }
+  .ios-tip strong { display: block; margin-bottom: 4px; font-size: 12px; }
+  .ios-tip-close {
+    float: right;
+    background: none;
+    border: none;
+    color: var(--accent2);
+    font-size: 18px;
+    cursor: pointer;
+    line-height: 1;
+    opacity: 0.7;
+    margin-left: 8px;
+    margin-top: -2px;
+  }
+
+  /* Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 14px;
+  }
+  .card-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--text2);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-label::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+
+  /* Frequency grid */
+  .freq-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+  }
+  .freq-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 6px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    color: var(--text2);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .freq-btn:active { transform: scale(0.95); }
+  .freq-btn.selected {
+    background: rgba(74,127,255,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+    box-shadow: 0 0 12px rgba(74,127,255,0.2);
+  }
+  .freq-btn .preview-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 5px auto 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .freq-btn.selected .preview-dot { opacity: 1; }
+
+  /* Radio options */
+  .radio-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .radio-opt {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .radio-opt.selected {
+    border-color: var(--accent);
+    background: rgba(74,127,255,0.08);
+  }
+  .radio-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid var(--text2);
+    flex-shrink: 0;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .radio-opt.selected .radio-dot {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--glow);
+  }
+  .radio-dot::after {
+    content: '';
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: white;
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .radio-opt.selected .radio-dot::after { opacity: 1; }
+  .radio-text { font-size: 13px; color: var(--text); }
+  .radio-sub { font-size: 10.5px; color: var(--text2); margin-top: 2px; }
+
+  /* Sliders */
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 4px;
+  }
+  .slider-label { font-size: 11px; color: var(--text2); width: 28px; flex-shrink: 0; }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 4px;
+    background: var(--surface2);
+    outline: none;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px rgba(74,127,255,0.5);
+    cursor: pointer;
+  }
+  .slider-val {
+    font-size: 12px;
+    color: var(--accent);
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* Timer display */
+  .timer-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    margin-bottom: 14px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .timer-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 100%, rgba(74,127,255,0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .timer-display {
+    font-family: 'DM Serif Display', serif;
+    font-size: 52px;
+    letter-spacing: -2px;
+    color: var(--text);
+    line-height: 1;
+    margin-bottom: 8px;
+    position: relative;
+  }
+  .timer-display.running {
+    color: var(--accent2);
+    text-shadow: 0 0 20px rgba(0,212,170,0.4);
+  }
+  .status-text {
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--text2);
+    text-transform: uppercase;
+  }
+
+  /* Visualizer bars */
+  .visualizer {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 3px;
+    height: 30px;
+    margin: 16px 0 0;
+  }
+  .bar {
+    width: 3px;
+    background: var(--accent);
+    border-radius: 2px;
+    opacity: 0.4;
+    transition: height 0.15s ease;
+    min-height: 3px;
+  }
+
+  /* Start/stop buttons */
+  .btn-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .btn-start {
+    flex: 1;
+    padding: 18px;
+    background: var(--accent);
+    border: none;
+    border-radius: var(--radius);
+    color: white;
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(74,127,255,0.35);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-start:active { transform: scale(0.97); box-shadow: 0 2px 10px rgba(74,127,255,0.2); }
+  .btn-start:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-stop {
+    padding: 18px 22px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text2);
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn-stop:active { background: rgba(255,107,107,0.08); border-color: var(--warn); color: var(--warn); }
+  .btn-stop:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  /* Session history */
+  .history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-radius: 10px;
+    color: var(--text2);
+  }
+  .history-item .hi-freq { color: var(--accent); font-size: 11px; }
+  .history-item .hi-dur { color: var(--accent2); }
+  .empty-history { font-size: 12px; color: var(--text2); opacity: 0.5; text-align: center; padding: 12px 0; }
+
+  /* Disclaimer */
+  .disclaimer {
+    font-size: 10.5px;
+    color: var(--text2);
+    opacity: 0.5;
+    text-align: center;
+    padding: 16px 0 24px;
+    line-height: 1.7;
+  }
+
+  /* Waveform animation */
+  @keyframes wave {
+    0%, 100% { height: 4px; }
+    50% { height: var(--h, 20px); }
+  }
+  .bar.active {
+    opacity: 0.8;
+    animation: wave calc(0.3s + var(--d, 0s)) ease-in-out infinite;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <h1>Tinnitus Therapy</h1>
+    <p>Cross-frequency de-correlating stimulus modulation<br>
+    <a href="https://doi.org/10.1016/j.heares.2025.109335" target="_blank">Yukhnovich et al., Hearing Research 2025</a></p>
+  </div>
+
+  <div class="ios-tip" id="iosTip">
+    <button class="ios-tip-close" onclick="document.getElementById('iosTip').style.display='none'">×</button>
+    <strong>📱 How to use in background on iPhone</strong>
+    1. Tap <b>Start Therapy</b> below<br>
+    2. Lock screen or switch apps — audio continues<br>
+    3. Use lock screen / Control Centre controls if needed<br>
+    <span style="opacity:0.7;font-size:10.5px">For best reliability: Add to Home Screen via Safari Share menu</span>
+  </div>
+
+  <!-- Frequency -->
+  <div class="card">
+    <div class="card-label">1 · Tinnitus Frequency</div>
+    <div class="freq-grid" id="freqGrid"></div>
+  </div>
+
+  <!-- Hearing profile -->
+  <div class="card">
+    <div class="card-label">2 · Hearing Profile</div>
+    <div class="radio-group" id="hearingGroup">
+      <div class="radio-opt selected" data-val="normal" onclick="selectHearing(this)">
+        <div class="radio-dot"></div>
+        <div><div class="radio-text">Normal hearing</div></div>
+      </div>
+      <div class="radio-opt" data-val="mild" onclick="selectHearing(this)">
+        <div class="radio-dot"></div>
+        <div><div class="radio-text">Mild hearing loss</div><div class="radio-sub">Slight high-frequency boost</div></div>
+      </div>
+      <div class="radio-opt" data-val="moderate" onclick="selectHearing(this)">
+        <div class="radio-dot"></div>
+        <div><div class="radio-text">Moderate hearing loss</div><div class="radio-sub">Medium high-frequency boost</div></div>
+      </div>
+      <div class="radio-opt" data-val="severe" onclick="selectHearing(this)">
+        <div class="radio-dot"></div>
+        <div><div class="radio-text">Severe hearing loss</div><div class="radio-sub">Strong high-frequency boost</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modulation type -->
+  <div class="card">
+    <div class="card-label">3 · Modulation Type</div>
+    <div class="radio-group" id="modGroup">
+      <div class="radio-opt selected" data-val="amplitude" onclick="selectMod(this)">
+        <div class="radio-dot"></div>
+        <div><div class="radio-text">Amplitude modulation</div><div class="radio-sub">Recommended</div></div>
+      </div>
+      <div class="radio-opt" data-val="phase" onclick="selectMod(this)">
+        <div class="radio-dot"></div>
+        <div><div class="radio-text">Phase modulation</div><div class="radio-sub">Similar efficacy in the study</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Balance -->
+  <div class="card">
+    <div class="card-label">4 · Stereo Balance (L / R)</div>
+    <div class="slider-row">
+      <span class="slider-label" style="text-align:left">L</span>
+      <input type="range" id="balanceSlider" min="-1" max="1" step="0.05" value="0"
+             oninput="updateBalance(this.value)">
+      <span class="slider-label" style="text-align:right">R</span>
+    </div>
+    <div style="text-align:center;margin-top:8px;font-size:11px;color:var(--accent)" id="balanceVal">Centre</div>
+  </div>
+
+  <!-- Volume -->
+  <div class="card">
+    <div class="card-label">5 · Volume</div>
+    <div class="slider-row">
+      <span class="slider-label">🔈</span>
+      <input type="range" id="volumeSlider" min="0" max="100" step="1" value="30"
+             oninput="updateVolume(this.value)">
+      <span class="slider-val" id="volumeVal">30%</span>
+    </div>
+    <div style="margin-top:8px;font-size:10.5px;color:var(--text2)">Start low — comfort over loudness</div>
+  </div>
+
+  <!-- Timer -->
+  <div class="timer-card">
+    <div class="timer-display" id="timerDisplay">00:00:00</div>
+    <div class="status-text" id="statusText">Ready to start</div>
+    <div class="visualizer" id="visualizer">
+      <!-- bars injected by JS -->
+    </div>
+  </div>
+
+  <!-- Buttons -->
+  <div class="btn-row">
+    <button class="btn-start" id="btnStart" onclick="startTherapy()">▶ START THERAPY</button>
+    <button class="btn-stop" id="btnStop" onclick="stopTherapy()" disabled>■ STOP</button>
+  </div>
+
+  <!-- Session history -->
+  <div class="card">
+    <div class="card-label">Session History</div>
+    <div class="history-list" id="historyList">
+      <div class="empty-history">No sessions recorded yet</div>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    Experimental tool based on published research.<br>
+    Consult a healthcare professional before use.<br>
+    Listen ~60 min/day. Use headphones for best results.
+  </div>
+
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────────────────────────────
+const FREQS = [500, 1000, 2000, 3000, 4000, 6000, 8000, 10000, 12000, 14000, 16000];
+let selectedFreq = 8000;
+let hearingProfile = 'normal';
+let modType = 'amplitude';
+let balance = 0;
+let volume = 0.30;
+let isRunning = false;
+let timerInterval = null;
+let startTime = null;
+let audioCtx = null;
+let nodes = {};
+let sessions = [];
+
+// Hearing loss boost profiles (gain in dB at high freqs, as linear multiplier)
+const HEARING_GAIN = { normal: 1.0, mild: 2.0, moderate: 4.0, severe: 8.0 };
+
+// ─── Build frequency buttons ─────────────────────────────────────────────────
+function buildFreqGrid() {
+  const grid = document.getElementById('freqGrid');
+  FREQS.forEach(f => {
+    const btn = document.createElement('div');
+    btn.className = 'freq-btn' + (f === selectedFreq ? ' selected' : '');
+    btn.innerHTML = `${f >= 1000 ? (f/1000)+'k' : f}<div class="preview-dot"></div>`;
+    btn.onclick = () => {
+      document.querySelectorAll('.freq-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+      selectedFreq = f;
+      if (isRunning) restartAudio();
+    };
+    grid.appendChild(btn);
+  });
+}
+
+// ─── Radio helpers ───────────────────────────────────────────────────────────
+function selectHearing(el) {
+  document.querySelectorAll('#hearingGroup .radio-opt').forEach(r => r.classList.remove('selected'));
+  el.classList.add('selected');
+  hearingProfile = el.dataset.val;
+  if (isRunning) restartAudio();
+}
+function selectMod(el) {
+  document.querySelectorAll('#modGroup .radio-opt').forEach(r => r.classList.remove('selected'));
+  el.classList.add('selected');
+  modType = el.dataset.val;
+  if (isRunning) restartAudio();
+}
+function updateBalance(v) {
+  balance = parseFloat(v);
+  const label = balance === 0 ? 'Centre' : (balance < 0 ? `L ${Math.abs(Math.round(balance*100))}%` : `R ${Math.round(balance*100)}%`);
+  document.getElementById('balanceVal').textContent = label;
+  if (nodes.pannerL) nodes.pannerL.pan.setTargetAtTime(Math.max(-1, balance - 0.1), audioCtx.currentTime, 0.01);
+  if (nodes.pannerR) nodes.pannerR.pan.setTargetAtTime(Math.min(1, balance + 0.1), audioCtx.currentTime, 0.01);
+}
+function updateVolume(v) {
+  volume = parseInt(v) / 100;
+  document.getElementById('volumeVal').textContent = v + '%';
+  if (nodes.masterGain) nodes.masterGain.gain.setTargetAtTime(volume, audioCtx.currentTime, 0.05);
+}
+
+// ─── Visualizer ──────────────────────────────────────────────────────────────
+function buildVisualizer() {
+  const viz = document.getElementById('visualizer');
+  viz.innerHTML = '';
+  for (let i = 0; i < 20; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'bar';
+    bar.style.cssText = `--h:${6 + Math.random()*22}px;--d:${(Math.random()*0.4).toFixed(2)}s`;
+    viz.appendChild(bar);
+  }
+}
+function animateBars(on) {
+  document.querySelectorAll('.bar').forEach(b => b.classList.toggle('active', on));
+}
+
+// ─── Timer ───────────────────────────────────────────────────────────────────
+function formatTime(ms) {
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600).toString().padStart(2,'0');
+  const m = Math.floor((s % 3600) / 60).toString().padStart(2,'0');
+  const ss = (s % 60).toString().padStart(2,'0');
+  return `${h}:${m}:${ss}`;
+}
+
+// ─── Core Audio Engine ───────────────────────────────────────────────────────
+// Cross-frequency de-correlating spectral ripple modulation
+// Based on Yukhnovich et al. 2025 (Hearing Research)
+//
+// Algorithm:
+// - Generate white noise across full spectrum
+// - Apply a time-varying spectral ripple filter centred on tinnitus frequency
+//   with slowly drifting phase, removing cross-frequency correlations
+// - For amplitude mod: each 1/3-octave band gets independent slow random AM
+// - For phase mod: each band gets independent random phase rotation
+// - Bands within ~2 octaves of tinnitus frequency receive extra weight
+// - Hearing profile: shelf boost above tinnitus frequency
+
+function createAudio() {
+  if (audioCtx) { audioCtx.close(); audioCtx = null; nodes = {}; }
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // Resume on iOS (needs user gesture context)
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const sampleRate = audioCtx.sampleRate;
+  const masterGain = audioCtx.createGain();
+  masterGain.gain.value = volume;
+  masterGain.connect(audioCtx.destination);
+
+  // Left / right panners for balance
+  const pannerL = audioCtx.createStereoPanner();
+  const pannerR = audioCtx.createStereoPanner();
+  pannerL.pan.value = Math.max(-1, balance - 0.1);
+  pannerR.pan.value = Math.min(1, balance + 0.1);
+  pannerL.connect(masterGain);
+  pannerR.connect(masterGain);
+
+  const tf = selectedFreq;
+  const gainBoost = HEARING_GAIN[hearingProfile];
+
+  // Build ~18 1/3-octave bands from 200 Hz to 18 kHz
+  const bands = [];
+  let f = 200;
+  while (f <= 18000) {
+    bands.push(f);
+    f *= Math.pow(2, 1/3);
+  }
+
+  // For each band: noise source → bandpass filter → AM/PM modulation → gain
+  // Each channel (L/R) gets independent modulators = de-correlation
+  ['L','R'].forEach(ch => {
+    const panner = ch === 'L' ? pannerL : pannerR;
+    const chGain = audioCtx.createGain();
+    chGain.gain.value = 1 / Math.sqrt(bands.length);
+    chGain.connect(panner);
+
+    bands.forEach((fc, i) => {
+      // White noise buffer (4 seconds, looped)
+      const bufSec = 4;
+      const bufLen = sampleRate * bufSec;
+      const buffer = audioCtx.createBuffer(1, bufLen, sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let j = 0; j < bufLen; j++) data[j] = Math.random() * 2 - 1;
+
+      const src = audioCtx.createBufferSource();
+      src.buffer = buffer;
+      src.loop = true;
+      // Randomize loop start so L/R are de-correlated
+      src.loopStart = Math.random() * bufSec;
+      src.loopEnd = bufSec;
+
+      // Bandpass filter centred at fc
+      const bp = audioCtx.createBiquadFilter();
+      bp.type = 'bandpass';
+      bp.frequency.value = fc;
+      bp.Q.value = 2.5; // ~1/3 octave
+
+      // Proximity weighting: boost bands near tinnitus freq
+      const octaveDist = Math.abs(Math.log2(fc / tf));
+      const proximityGain = Math.exp(-octaveDist * 0.7) + 0.15;
+
+      // High-freq shelf gain for hearing loss
+      const hfGain = fc >= tf ? gainBoost : 1.0;
+      const totalGain = proximityGain * hfGain;
+
+      const bandGain = audioCtx.createGain();
+      bandGain.gain.value = totalGain;
+
+      src.connect(bp);
+      bp.connect(bandGain);
+
+      if (modType === 'amplitude') {
+        // Independent slow AM per band (0.05–0.5 Hz)
+        const lfo = audioCtx.createOscillator();
+        lfo.frequency.value = 0.05 + Math.random() * 0.45;
+        lfo.type = 'sine';
+        const lfoGain = audioCtx.createGain();
+        lfoGain.gain.value = 0.5;
+        const modGain = audioCtx.createGain();
+        modGain.gain.value = 0.5; // baseline so AM goes 0→1
+        lfo.connect(lfoGain);
+        lfoGain.connect(modGain.gain);
+        bandGain.connect(modGain);
+        modGain.connect(chGain);
+        lfo.start();
+      } else {
+        // Phase mod: use a small frequency wobble (FM) for each band
+        // This creates time-varying phase relationships between bands
+        const phaseMod = audioCtx.createOscillator();
+        phaseMod.frequency.value = 0.03 + Math.random() * 0.3;
+        phaseMod.type = 'sine';
+        const phaseModGain = audioCtx.createGain();
+        phaseModGain.gain.value = fc * 0.01; // small fraction of centre freq
+        phaseMod.connect(phaseModGain);
+        phaseModGain.connect(bp.frequency);
+        bandGain.connect(chGain);
+        phaseMod.start();
+      }
+
+      src.start(audioCtx.currentTime + Math.random() * 0.1);
+    });
+  });
+
+  nodes = { masterGain, pannerL, pannerR };
+}
+
+// ─── iOS silent audio trick ───────────────────────────────────────────────────
+// A playing <audio> element tells iOS this is an audio-producing page,
+// allowing the Web Audio API context to persist when backgrounded.
+function startSilentAudio() {
+  const sil = document.getElementById('silence');
+  // Create a tiny silent audio context and connect it to keep session alive
+  try {
+    sil.volume = 0.001; // near silent
+    const promise = sil.play();
+    if (promise) promise.catch(() => {});
+  } catch(e) {}
+}
+
+// ─── Start / stop ─────────────────────────────────────────────────────────────
+function startTherapy() {
+  if (isRunning) return;
+
+  startSilentAudio();
+  createAudio();
+
+  isRunning = true;
+  startTime = Date.now();
+
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStop').disabled = false;
+  document.getElementById('timerDisplay').classList.add('running');
+  document.getElementById('statusText').textContent = 'Therapy in progress';
+  animateBars(true);
+
+  timerInterval = setInterval(() => {
+    document.getElementById('timerDisplay').textContent = formatTime(Date.now() - startTime);
+  }, 1000);
+
+  // Keep audio context alive on iOS: resume on page visibility change
+  document.addEventListener('visibilitychange', handleVisibility);
+}
+
+function handleVisibility() {
+  if (!isRunning) return;
+  if (document.visibilityState === 'visible' && audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function stopTherapy() {
+  if (!isRunning) return;
+  isRunning = false;
+
+  const duration = Date.now() - startTime;
+  document.removeEventListener('visibilitychange', handleVisibility);
+
+  clearInterval(timerInterval);
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  try { document.getElementById('silence').pause(); } catch(e) {}
+
+  // Save session
+  sessions.unshift({
+    date: new Date().toLocaleDateString('en-GB', {day:'2-digit',month:'short', hour:'2-digit',minute:'2-digit'}),
+    freq: selectedFreq,
+    duration
+  });
+  if (sessions.length > 20) sessions.pop();
+  renderHistory();
+
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  document.getElementById('timerDisplay').classList.remove('running');
+  document.getElementById('timerDisplay').textContent = formatTime(duration);
+  document.getElementById('statusText').textContent = 'Session complete';
+  animateBars(false);
+}
+
+function restartAudio() {
+  if (!isRunning) return;
+  if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  createAudio();
+}
+
+// ─── Session history ──────────────────────────────────────────────────────────
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  if (sessions.length === 0) {
+    list.innerHTML = '<div class="empty-history">No sessions recorded yet</div>';
+    return;
+  }
+  list.innerHTML = sessions.map(s =>
+    `<div class="history-item">
+      <span>${s.date}</span>
+      <span class="hi-freq">${s.freq >= 1000 ? s.freq/1000+'k' : s.freq} Hz</span>
+      <span class="hi-dur">${formatTime(s.duration)}</span>
+    </div>`
+  ).join('');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+buildFreqGrid();
+buildVisualizer();
+</script>
+</body>
+</html>
